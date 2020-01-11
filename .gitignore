@@ -2,3 +2,5 @@
 .gradle
 .vscode
 build
+*.class
+.settings/org.eclipse.buildship.core.prefs
