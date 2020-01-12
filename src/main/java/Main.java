@@ -18,6 +18,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import edu.wpi.cscore.CvSource;
 import edu.wpi.cscore.MjpegServer;
 import edu.wpi.cscore.UsbCamera;
 import edu.wpi.cscore.VideoSource;
@@ -326,9 +327,12 @@ public final class Main {
 
     // start image processing on camera 0 if present
     if (cameras.size() >= 1) {
-      VisionThread visionThread = new VisionThread(cameras.get(0),
-              new ControlPanelWheel(), pipeline -> {
-        // do something with pipeline results
+
+      CvSource outputStream = CameraServer.getInstance().putVideo("Annotated Control Panel stream", 160, 120);
+
+      VisionThread visionThread = new VisionThread(cameras.get(0), new ControlPanelWheelAnnotator(), pipeline -> {
+
+        outputStream.putFrame(pipeline.annotateImage(pipeline.getLastImage()));
       });
 
       visionThread.start();
