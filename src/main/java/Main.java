@@ -333,15 +333,22 @@ public final class Main {
 
       VisionThread visionThread = new VisionThread(cameras.get(0), new ControlPanelWheelAnnotator(), pipeline -> {
 
-        Mat matCamera = pipeline.getLastImage();
-
         ArrayList<Wedge> wedges = pipeline.getWedges();
 
-        matCamera = pipeline.drawWedgeAnnotations(matCamera, wedges, new Scalar(0, 0, 0));
+        /*
+         * When nobody is connected to the diagnostic, annotated outputStream, don't
+         * bother updating it, to reduce computer throughput.
+         */
+        if (outputStream.isEnabled()) {
+          Mat matCamera = pipeline.getLastImage();
 
-        matCamera = pipeline.annotateImage(matCamera);
-        
-        outputStream.putFrame(matCamera);
+          matCamera = pipeline.drawWedgeAnnotations(matCamera, wedges, new Scalar(0, 0, 0));
+
+          matCamera = pipeline.annotateImage(matCamera);
+
+          outputStream.putFrame(matCamera);
+        }
+
       });
 
       visionThread.start();
