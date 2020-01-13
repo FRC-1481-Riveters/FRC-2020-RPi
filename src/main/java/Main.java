@@ -29,6 +29,7 @@ import edu.wpi.first.vision.VisionPipeline;
 import edu.wpi.first.vision.VisionThread;
 
 import org.opencv.core.Mat;
+import org.opencv.core.Scalar;
 
 /*
    JSON format:
@@ -332,7 +333,15 @@ public final class Main {
 
       VisionThread visionThread = new VisionThread(cameras.get(0), new ControlPanelWheelAnnotator(), pipeline -> {
 
-        outputStream.putFrame(pipeline.annotateImage(pipeline.getLastImage()));
+        Mat matCamera = pipeline.getLastImage();
+
+        ArrayList<Wedge> wedges = pipeline.getWedges();
+
+        matCamera = pipeline.drawConfidenceValues(matCamera, wedges, new Scalar(0, 0, 0));
+
+        matCamera = pipeline.annotateImage(matCamera);
+        
+        outputStream.putFrame(matCamera);
       });
 
       visionThread.start();
