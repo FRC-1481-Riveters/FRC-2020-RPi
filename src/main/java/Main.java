@@ -337,7 +337,7 @@ public final class Main {
 
         ArrayList<Wedge> wedges = pipeline.getWedges();
 
-        matCamera = pipeline.drawConfidenceValues(matCamera, wedges, new Scalar(0, 0, 0));
+        matCamera = pipeline.drawWedgeAnnotations(matCamera, wedges, new Scalar(0, 0, 0));
 
         matCamera = pipeline.annotateImage(matCamera);
         
