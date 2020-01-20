@@ -1,0 +1,149 @@
+{
+    "cameras": [
+        {
+            "brightness": 0,
+            "exposure": "auto",
+            "fps": 30,
+            "height": 480,
+            "name": "Shooter",
+            "path": "/dev/video0",
+            "pixel format": "yuyv",
+            "properties": [
+                {
+                    "name": "connect_verbose",
+                    "value": 1
+                },
+                {
+                    "name": "contrast",
+                    "value": 50
+                },
+                {
+                    "name": "saturation",
+                    "value": 33
+                },
+                {
+                    "name": "power_line_frequency",
+                    "value": 2
+                },
+                {
+                    "name": "sharpness",
+                    "value": 40
+                },
+                {
+                    "name": "backlight_compensation",
+                    "value": 0
+                },
+                {
+                    "name": "pan_absolute",
+                    "value": 0
+                },
+                {
+                    "name": "tilt_absolute",
+                    "value": 0
+                },
+                {
+                    "name": "zoom_absolute",
+                    "value": 0
+                }
+            ],
+            "stream": {
+                "properties": [
+                    {
+                        "name": "width",
+                        "value": 640
+                    },
+                    {
+                        "name": "height",
+                        "value": 480
+                    },
+                    {
+                        "name": "fps",
+                        "value": 10
+                    },
+                    {
+                        "name": "compression",
+                        "value": 50
+                    },
+                    {
+                        "name": "default_compression",
+                        "value": 50
+                    }
+                ]
+            },
+            "white balance": "auto",
+            "width": 640
+        },
+        {
+            "brightness": 50,
+            "exposure": "auto",
+            "fps": 15,
+            "height": 240,
+            "name": "Front",
+            "path": "/dev/video2",
+            "pixel format": "mjpeg",
+            "properties": [
+                {
+                    "name": "connect_verbose",
+                    "value": 1
+                },
+                {
+                    "name": "contrast",
+                    "value": 33
+                },
+                {
+                    "name": "saturation",
+                    "value": 42
+                },
+                {
+                    "name": "hue",
+                    "value": 60
+                },
+                {
+                    "name": "gamma",
+                    "value": 100
+                },
+                {
+                    "name": "gain",
+                    "value": 0
+                },
+                {
+                    "name": "power_line_frequency",
+                    "value": 1
+                },
+                {
+                    "name": "sharpness",
+                    "value": 16
+                },
+                {
+                    "name": "backlight_compensation",
+                    "value": 1
+                },
+                {
+                    "name": "exposure_auto_priority",
+                    "value": true
+                }
+            ],
+            "stream": {
+                "properties": []
+            },
+            "white balance": "auto",
+            "width": 320
+        },
+        {
+            "name": "Rear",
+            "path": "/dev/video3",
+            "pixel format": null,
+            "stream": {
+                "properties": []
+            }
+        }
+    ],
+    "ntmode": "client",
+    "switched cameras": [
+        {
+            "key": "DriverCamera",
+            "name": "Driver view"
+        }
+    ],
+    "team": 1481
+}
