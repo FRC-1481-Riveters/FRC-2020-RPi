@@ -1,0 +1,14 @@
+step 1
+    vision
+        detects target using infared camera and aligns the robot to correctly shoot the power call into the upper port
+            how it will do it:
+            driver will press button in order to use  align the robot, the infared camera detects reflection tape
+           and move into a good spot and shoot from protected target zone and initiation line. 
+           use case 1: button gets pressed and robot aligns and shoots fpr upper port
+           use case 2: during auton, robot shall use alignment command 
+                       then will shoot the power cell from trench
+step 2 
+    inputs: infared camera, joystick, RPI, gyroscope
+    outputs: reflection tape, shows target on screen, infared light??
+step 3
+    i dont know
