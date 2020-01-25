@@ -28,6 +28,7 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.vision.VisionPipeline;
 import edu.wpi.first.vision.VisionThread;
 
+
 import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 
@@ -41,7 +42,8 @@ import org.opencv.core.Scalar;
                "name": <camera name>
                "path": <path, e.g. "/dev/video0">
                "pixel format": <"MJPEG", "YUYV", etc>   // optional
-               "width": <video mode width>              // optional
+               "width": <video mode width>              // 
+                              "FOV": <camera's horizontal field of view in degrees> // optional (150 degrees if not specified)
                "height": <video mode height>            // optional
                "fps": <video mode fps>                  // optional
                "brightness": <percentage brightness>    // optional
@@ -96,6 +98,8 @@ public final class Main {
   public static List<CameraConfig> cameraConfigs = new ArrayList<>();
   public static List<SwitchedCameraConfig> switchedCameraConfigs = new ArrayList<>();
   public static List<VideoSource> cameras = new ArrayList<>();
+
+  static long fieldOfView = 60;
 
   private Main() {
   }
@@ -330,8 +334,27 @@ public final class Main {
     if (cameras.size() >= 1) {
 
       CvSource outputStream = CameraServer.getInstance().putVideo("Annotated Control Panel stream", 160, 120);
+      try {
+        /*
+         * Get the first camera's configuration JSONElement "FOV" if it exists, then
+         * render it as a long. If the element isn't in the JSON /boot/frc.json file,
+         * the get() will return a null, which will cause the getAsLong() to throw an
+         * exception. Just use the default, initially set, value intead of what's in the
+         * file.
+         */
 
-      VisionThread visionThread = new VisionThread(cameras.get(0), new ControlPanelWheelAnnotator(), pipeline -> {
+        fieldOfView = cameraConfigs.get(0).config.get("FOV").getAsLong();
+        System.out.println(String.format("Set FOV to %d", fieldOfView));
+      } catch (Exception e) {
+        System.out.println(String.format(
+            "Couldn't understand camera's FOV configuration value (ex: FOV: 150 ). Using %d instead.", fieldOfView));
+      }
+      VisionThread visionThread = new VisionThread(cameras.get(0), new PowerPortAnnotator(), pipeline -> {
+        ArrayList<PowerPortTarget> m_powerPortTarget = pipeline.getPowerPorts();
+
+        double fRelativeTargetHeading = targetDetails.normalizedCenter * (double) fieldOfView / 2.0f;
+        long targetProcessingTime = System.currentTimeMillis() - startTime;
+        double targetDistance = Double.NaN;      
 
         ArrayList<Wedge> wedges = pipeline.getWedges();
 
@@ -343,7 +366,30 @@ public final class Main {
           Mat matCamera = pipeline.getLastImage();
 
           matCamera = pipeline.drawWedgeAnnotations(matCamera, wedges, new Scalar(0, 0, 0));
-
+          
+            /*
+           * Compute the distance to target using known features of the target, the
+           * resolution and the FOV of the camera.
+           * 
+           * d = Tin*FOVpixel/(2*Tpixel*tanΘ)
+           * 
+           * Where: Θ is 1/2 of the FOV Tin is the actual width of the target, which is
+           * the distance between the centers of the vision targets. FOVpixel is the width
+           * of the display in pixels (the horizontal resolution) Tpixel is the length of
+           * the target in pixels (the distance between the centers of the vision targets
+           * in pixels)
+           * 
+           * dNormalized = FOVPixel/Tpixel
+           * 
+           * 
+           * So, just compute the rest by multiplying dNormalized * Tin / (2*tanΘ)
+           * 
+           * 
+           * 
+           */
+          double targetWidth = 11.267601903166458855661396068853; /* Distance between center of targets in inches */
+          targetDistance = targetDetails.distanceToTargetNormalized * targetWidth
+              / (2.0 * Math.tan(Math.toRadians((double) fieldOfView / 2.0)));
           matCamera = pipeline.annotateImage(matCamera);
 
           outputStream.putFrame(matCamera);

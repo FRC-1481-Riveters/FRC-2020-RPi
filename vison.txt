@@ -11,4 +11,7 @@ step 2
     inputs: infared camera, joystick, RPI, gyroscope
     outputs: reflection tape, shows target on screen, infared light??
 step 3
-    i dont know
+    yess did it
+step 4
+    Constants:
+        check roborio for the rest

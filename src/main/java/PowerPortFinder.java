@@ -11,6 +11,7 @@ public class PowerPortFinder extends PowerPort {
     private Mat m_lastImage;
     private MatOfPoint m_prototypePowerPortContour;
     private double m_maxMatchThreshold = 15.0;
+    List<PowerPortTarget> m_powerPortTargets = new ArrayList<>();
 
 
     public PowerPortFinder() {
@@ -42,8 +43,6 @@ public class PowerPortFinder extends PowerPort {
 
     private List<PowerPortTarget> processPowerPortContours(List<MatOfPoint> contours) {
 
-        List<PowerPortTarget> PowerPortTargets = new ArrayList<>();
-
         for (MatOfPoint contour : contours) {
             double matchStrength = Imgproc.matchShapes(m_prototypePowerPortContour, contour, Imgproc.CONTOURS_MATCH_I3,
                     0.0);
@@ -64,16 +63,16 @@ public class PowerPortFinder extends PowerPort {
                     double y_aimPoint = y;
                                        
                     
-                    PowerPortTargets.add(new PowerPortTarget(contour, new Point(x, y), new Point (x_aimPoint, y_aimPoint), matchStrength));
+                    m_powerPortTargets.add(new PowerPortTarget(contour, new Point(x, y), new Point (x_aimPoint, y_aimPoint), matchStrength));
                 } catch (Exception ex) {
 
                 }
             }
         }
         
-        Collections.sort(PowerPortTargets);
+        Collections.sort(m_powerPortTargets);
 
-        return PowerPortTargets;
+        return m_powerPortTargets;
     }
 
     public ArrayList<PowerPortTarget> getPowerPorts() {
@@ -103,5 +102,14 @@ public class PowerPortFinder extends PowerPort {
 		}
 
 		return angle;
-	}
+    }
+    double normalizedCenter(){
+        double targetInformation;
+        try {
+        targetInformation = 2.0f * ((m_powerPortTargets.get(0).aimPoint.x / m_lastImage.cols()) - 0.5f);
+        } catch (Exception ex) {
+            targetInformation = 0;
+        }
+        return targetInformation; 
+    }
 }
