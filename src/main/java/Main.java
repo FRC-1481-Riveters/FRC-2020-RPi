@@ -24,13 +24,12 @@ import edu.wpi.cscore.UsbCamera;
 import edu.wpi.cscore.VideoSource;
 import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.networktables.EntryListenerFlags;
+import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.vision.VisionPipeline;
 import edu.wpi.first.vision.VisionThread;
 
-
 import org.opencv.core.Mat;
-import org.opencv.core.Scalar;
 
 /*
    JSON format:
@@ -281,7 +280,7 @@ public final class Main {
               }
             },
             EntryListenerFlags.kImmediate | EntryListenerFlags.kNew | EntryListenerFlags.kUpdate);
-
+         
     return server;
   }
 
@@ -329,11 +328,21 @@ public final class Main {
     for (SwitchedCameraConfig config : switchedCameraConfigs) {
       startSwitchedCamera(config);
     }
+    /*
+       * Set the update rate to slower than normal, and call the flush() instead to
+       * send the target information with low latency.
+       *
+       * https://www.chiefdelphi.com/t/networking-a-raspberry-pi/335503/16
+       */
+      ntinst.setUpdateRate(1.0);
 
     // start image processing on camera 0 if present
     if (cameras.size() >= 1) {
 
-      CvSource outputStream = CameraServer.getInstance().putVideo("Annotated Control Panel stream", 160, 120);
+      CvSource outputStream = CameraServer.getInstance().putVideo("Annotated PowerPort stream", 160, 120);
+
+      NetworkTableEntry targetInformation = ntinst.getTable("Vision").getEntry("targetInformation");
+
       try {
         /*
          * Get the first camera's configuration JSONElement "FOV" if it exists, then
@@ -349,48 +358,47 @@ public final class Main {
         System.out.println(String.format(
             "Couldn't understand camera's FOV configuration value (ex: FOV: 150 ). Using %d instead.", fieldOfView));
       }
+
       VisionThread visionThread = new VisionThread(cameras.get(0), new PowerPortAnnotator(), pipeline -> {
-        ArrayList<PowerPortTarget> m_powerPortTarget = pipeline.getPowerPorts();
 
-        double fRelativeTargetHeading = targetDetails.normalizedCenter * (double) fieldOfView / 2.0f;
-        long targetProcessingTime = System.currentTimeMillis() - startTime;
-        double targetDistance = Double.NaN;      
+        double relativeHeading = pipeline.getNormalizedCenter() * (double) fieldOfView / 2.0f;
 
-        ArrayList<Wedge> wedges = pipeline.getWedges();
+        double targetWidth = 39.26; /* Width of a real and ideal target in inches */
+        double targetDistance = pipeline.getNormalizedTargetDistance(fieldOfView) * targetWidth;
 
         /*
-         * When nobody is connected to the diagnostic, annotated outputStream, don't
-         * bother updating it, to reduce computer throughput.
+         * Send the information packet to the Roborio that contains an array of doubles.
+         * The doubles contain the values:
+         * 
+         * [0] the offset angle of the target in degrees relative to the current
+         * heading.
+         * 
+         * [1] the age of this target information in milliseconds.
+         * 
+         * [2] the computed distance to the target based on the known relative size of
+         * the target
+         * 
+         */
+        targetInformation
+            .setDoubleArray(new double[] { relativeHeading, pipeline.getProcessingTime(), targetDistance });
+
+        /*
+         * Flush the network table queue to quickly send this network table field to the
+         * roborio. This reduces the network latency of this information to almost
+         * nothing.
+         */
+        targetInformation.getInstance().flush();
+
+        /*
+         * Generate an annotated image stream with the annotateImage() function, which
+         * paints contours and text of all the targets that were found. When nobody is
+         * connected to the diagnostic, annotated outputStream, don't bother updating
+         * it, to reduce computer throughput.
          */
         if (outputStream.isEnabled()) {
           Mat matCamera = pipeline.getLastImage();
 
-          matCamera = pipeline.drawWedgeAnnotations(matCamera, wedges, new Scalar(0, 0, 0));
-          
-            /*
-           * Compute the distance to target using known features of the target, the
-           * resolution and the FOV of the camera.
-           * 
-           * d = Tin*FOVpixel/(2*Tpixel*tanΘ)
-           * 
-           * Where: Θ is 1/2 of the FOV Tin is the actual width of the target, which is
-           * the distance between the centers of the vision targets. FOVpixel is the width
-           * of the display in pixels (the horizontal resolution) Tpixel is the length of
-           * the target in pixels (the distance between the centers of the vision targets
-           * in pixels)
-           * 
-           * dNormalized = FOVPixel/Tpixel
-           * 
-           * 
-           * So, just compute the rest by multiplying dNormalized * Tin / (2*tanΘ)
-           * 
-           * 
-           * 
-           */
-          double targetWidth = 11.267601903166458855661396068853; /* Distance between center of targets in inches */
-          targetDistance = targetDetails.distanceToTargetNormalized * targetWidth
-              / (2.0 * Math.tan(Math.toRadians((double) fieldOfView / 2.0)));
-          matCamera = pipeline.annotateImage(matCamera);
+          matCamera = pipeline.annotateImage(matCamera, pipeline.getPowerPorts());
 
           outputStream.putFrame(matCamera);
         }
