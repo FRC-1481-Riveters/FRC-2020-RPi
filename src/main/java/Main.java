@@ -24,6 +24,7 @@ import edu.wpi.cscore.UsbCamera;
 import edu.wpi.cscore.VideoSource;
 import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.networktables.EntryListenerFlags;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.vision.VisionPipeline;
@@ -31,6 +32,8 @@ import edu.wpi.first.vision.VisionThread;
 
 import org.opencv.core.Mat;
 
+import java.lang.Runtime;
+import java.util.Date;
 /*
    JSON format:
    {
@@ -99,6 +102,8 @@ public final class Main {
   public static List<VideoSource> cameras = new ArrayList<>();
 
   static long fieldOfView = 60;
+
+  static long autoAssistConnectionTestLastReceivedTimeStamp;
 
   private Main() {
   }
@@ -336,6 +341,44 @@ public final class Main {
        */
       ntinst.setUpdateRate(1.0);
 
+    NetworkTableEntry autoAssistConnectionTest = NetworkTableInstance.getDefault().getTable("Vision")
+        .getEntry("autoAssistConnectionTest");
+    /*
+     * Get a timestamp that represents the last time we received something from the
+     * Roborio. This particular signal is transmitted every 500 ms. Thus, this is a
+     * good "Hi. I'm the roborio and I'm listening to you." message. Use this
+     * timestamp later to see if the roborio has stopped listening to us.
+     * 
+     * Try to coordinate system times between the roborio and the raspberry pi so
+     * that timestamps on annotated video is easy to combine with log entries.
+     */
+    autoAssistConnectionTest.addListener(event -> {
+
+      double millisecondsSinceEpochOnRoboRIO = event.value.getDouble();
+
+      /*
+       * Check if the RPi's system time is more than 0.5 seconds different from the
+       * RoboRIO's system time.
+       * 
+       * If it is, update the RPi's system clock to the RoboRIO's system clock.
+       */
+      if (Math.abs(System.currentTimeMillis() - (long) millisecondsSinceEpochOnRoboRIO) > 500) {
+
+        try {
+          Runtime runTime = Runtime.getRuntime();
+          runTime.exec(String.format("sudo date -s @%.3f", millisecondsSinceEpochOnRoboRIO / 1000.0));
+          System.out.format("Updated the RPi's system clock to %s%n", new Date().toString());
+        } catch (Exception e) {
+          System.out.format("Couldn't set system time from %.3f:%s%n", millisecondsSinceEpochOnRoboRIO / 1000.0,
+              e.toString());
+        }
+
+      }
+
+      autoAssistConnectionTestLastReceivedTimeStamp = System.currentTimeMillis();
+      
+    }, EntryListenerFlags.kNew | EntryListenerFlags.kUpdate);
+
     // start image processing on camera 0 if present
     if (cameras.size() >= 1) {
 
@@ -411,7 +454,38 @@ public final class Main {
     // loop forever
     for (;;) {
       try {
-        Thread.sleep(10000);
+        Thread.sleep(1000);
+
+        /*
+         * Determine how long it's been since we last heard from the roborio. If it's
+         * been too long, assume that something's gone amiss with the NetworkTables
+         * connection to the roborio and do something about it.
+         */
+        long timeSinceLastRoborioEcho = System.currentTimeMillis() - autoAssistConnectionTestLastReceivedTimeStamp;
+
+        try {
+          if (timeSinceLastRoborioEcho > 1000) {
+            /*
+             * It's been too long since we last heard from the roborio. Assume that
+             * something has gone wrong with the NetworkTables communication. Stop it and
+             * restart it.
+             * 
+             * Don't do this too often as it'll increase the latency of the things we send
+             * over network tables, but don't wait too long to try to fix communications
+             * between the vision processor and the roborio if it's gone amiss. 1 second is
+             * plenty long enough to wait for the roborio. Do something if it's been longer
+             * than that since we've heard from the roborio.
+             */
+            System.out.println(
+                String.format("Restarting networktables client because I haven't heard from the roborio for %d ms",
+                    timeSinceLastRoborioEcho));
+            ntinst.stopClient();
+            ntinst.startClientTeam(team);
+          }
+        } catch (Exception ex) {
+          System.out.println(String.format("Exception caught while testing roborio echo delay:%s", ex.toString()));
+        }
+
       } catch (InterruptedException ex) {
         return;
       }
