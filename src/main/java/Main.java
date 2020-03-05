@@ -334,12 +334,12 @@ public final class Main {
       startSwitchedCamera(config);
     }
     /*
-       * Set the update rate to slower than normal, and call the flush() instead to
-       * send the target information with low latency.
-       *
-       * https://www.chiefdelphi.com/t/networking-a-raspberry-pi/335503/16
-       */
-      ntinst.setUpdateRate(1.0);
+     * Set the update rate to slower than normal, and call the flush() instead to
+     * send the target information with low latency.
+     *
+     * https://www.chiefdelphi.com/t/networking-a-raspberry-pi/335503/16
+     */
+    ntinst.setUpdateRate(1.0);
 
     NetworkTableEntry autoAssistConnectionTest = NetworkTableInstance.getDefault().getTable("Vision")
         .getEntry("autoAssistConnectionTest");
@@ -376,79 +376,93 @@ public final class Main {
       }
 
       autoAssistConnectionTestLastReceivedTimeStamp = System.currentTimeMillis();
-      
+
     }, EntryListenerFlags.kNew | EntryListenerFlags.kUpdate);
 
-    // start image processing on camera 0 if present
-    if (cameras.size() >= 1) {
+    /*
+     * Find a camera named "Target". If there's a camera named Target, start
+     * PowerPort vision targeting on it and send the target results back to the
+     * RoboRIO to help it aim toward the PowerPort target.
+     */
+    {
+      String str = new String("Target");
 
-      CvSource outputStream = CameraServer.getInstance().putVideo("Annotated PowerPort stream", 160, 120);
+      for (int cameraConfigsIndex = 0; cameraConfigsIndex < cameraConfigs.size(); cameraConfigsIndex++) {
+        if (str.equals(cameraConfigs.get(cameraConfigsIndex).name)) {
 
-      NetworkTableEntry targetInformation = ntinst.getTable("Vision").getEntry("targetInformation");
+          // start image processing on camera "Target" if present
 
-      try {
-        /*
-         * Get the first camera's configuration JSONElement "FOV" if it exists, then
-         * render it as a long. If the element isn't in the JSON /boot/frc.json file,
-         * the get() will return a null, which will cause the getAsLong() to throw an
-         * exception. Just use the default, initially set, value intead of what's in the
-         * file.
-         */
+          CvSource outputStream = CameraServer.getInstance().putVideo("Annotated PowerPort stream", 160, 120);
 
-        fieldOfView = cameraConfigs.get(0).config.get("FOV").getAsLong();
-        System.out.println(String.format("Set FOV to %d", fieldOfView));
-      } catch (Exception e) {
-        System.out.println(String.format(
-            "Couldn't understand camera's FOV configuration value (ex: FOV: 150 ). Using %d instead.", fieldOfView));
-      }
+          NetworkTableEntry targetInformation = ntinst.getTable("Vision").getEntry("targetInformation");
 
-      VisionThread visionThread = new VisionThread(cameras.get(0), new PowerPortAnnotator(), pipeline -> {
+          try {
+            /*
+             * Get the first camera's configuration JSONElement "FOV" if it exists, then
+             * render it as a long. If the element isn't in the JSON /boot/frc.json file,
+             * the get() will return a null, which will cause the getAsLong() to throw an
+             * exception. Just use the default, initially set, value intead of what's in the
+             * file.
+             */
 
-        double relativeHeading = pipeline.getNormalizedCenter() * (double) fieldOfView / 2.0f;
+            fieldOfView = cameraConfigs.get(0).config.get("FOV").getAsLong();
+            System.out.println(String.format("Set FOV to %d", fieldOfView));
+          } catch (Exception e) {
+            System.out.println(
+                String.format("Couldn't understand camera's FOV configuration value (ex: FOV: 150 ). Using %d instead.",
+                    fieldOfView));
+          }
 
-        double targetWidth = 39.26; /* Width of a real and ideal target in inches */
-        double targetDistance = pipeline.getNormalizedTargetDistance(fieldOfView) * targetWidth;
+          VisionThread visionThread = new VisionThread(cameras.get(cameraConfigsIndex), new PowerPortAnnotator(),
+              pipeline -> {
 
-        /*
-         * Send the information packet to the Roborio that contains an array of doubles.
-         * The doubles contain the values:
-         * 
-         * [0] the offset angle of the target in degrees relative to the current
-         * heading.
-         * 
-         * [1] the age of this target information in milliseconds.
-         * 
-         * [2] the computed distance to the target based on the known relative size of
-         * the target
-         * 
-         */
-        targetInformation
-            .setDoubleArray(new double[] { relativeHeading, pipeline.getProcessingTime(), targetDistance });
+                double relativeHeading = pipeline.getNormalizedCenter() * (double) fieldOfView / 2.0f;
 
-        /*
-         * Flush the network table queue to quickly send this network table field to the
-         * roborio. This reduces the network latency of this information to almost
-         * nothing.
-         */
-        targetInformation.getInstance().flush();
+                double targetWidth = 39.26; /* Width of a real and ideal target in inches */
+                double targetDistance = pipeline.getNormalizedTargetDistance(fieldOfView) * targetWidth;
 
-        /*
-         * Generate an annotated image stream with the annotateImage() function, which
-         * paints contours and text of all the targets that were found. When nobody is
-         * connected to the diagnostic, annotated outputStream, don't bother updating
-         * it, to reduce computer throughput.
-         */
-        if (outputStream.isEnabled()) {
-          Mat matCamera = pipeline.getLastImage();
+                /*
+                 * Send the information packet to the Roborio that contains an array of doubles.
+                 * The doubles contain the values:
+                 * 
+                 * [0] the offset angle of the target in degrees relative to the current
+                 * heading.
+                 * 
+                 * [1] the age of this target information in milliseconds.
+                 * 
+                 * [2] the computed distance to the target based on the known relative size of
+                 * the target
+                 * 
+                 */
+                targetInformation
+                    .setDoubleArray(new double[] { relativeHeading, pipeline.getProcessingTime(), targetDistance });
 
-          matCamera = pipeline.annotateImage(matCamera, pipeline.getPowerPorts());
+                /*
+                 * Flush the network table queue to quickly send this network table field to the
+                 * roborio. This reduces the network latency of this information to almost
+                 * nothing.
+                 */
+                targetInformation.getInstance().flush();
 
-          outputStream.putFrame(matCamera);
+                /*
+                 * Generate an annotated image stream with the annotateImage() function, which
+                 * paints contours and text of all the targets that were found. When nobody is
+                 * connected to the diagnostic, annotated outputStream, don't bother updating
+                 * it, to reduce computer throughput.
+                 */
+                if (outputStream.isEnabled()) {
+                  Mat matCamera = pipeline.getLastImage();
+
+                  matCamera = pipeline.annotateImage(matCamera, pipeline.getPowerPorts());
+
+                  outputStream.putFrame(matCamera);
+                }
+
+              });
+
+          visionThread.start();
         }
-
-      });
-
-      visionThread.start();
+      }
     }
 
     // loop forever
