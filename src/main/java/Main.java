@@ -398,14 +398,14 @@ public final class Main {
 
           try {
             /*
-             * Get the first camera's configuration JSONElement "FOV" if it exists, then
+             * Get the Target camera's configuration JSONElement "FOV" if it exists, then
              * render it as a long. If the element isn't in the JSON /boot/frc.json file,
              * the get() will return a null, which will cause the getAsLong() to throw an
-             * exception. Just use the default, initially set, value intead of what's in the
+             * exception. Just use the default, initially set, value instead of what's in the
              * file.
              */
 
-            fieldOfView = cameraConfigs.get(0).config.get("FOV").getAsLong();
+            fieldOfView = cameraConfigs.get(cameraConfigsIndex).config.get("FOV").getAsLong();
             System.out.println(String.format("Set FOV to %d", fieldOfView));
           } catch (Exception e) {
             System.out.println(
